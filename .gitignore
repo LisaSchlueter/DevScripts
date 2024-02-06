@@ -1,0 +1,9 @@
+# plots
+*.pdf
+*.png
+
+# binaries
+*.h5
+*.txt
+
+
