@@ -1,5 +1,6 @@
 using LegendDataManagement
 using LegendHDF5IO, HDF5
+using Printf
 
 #function load_hitch(l200::LegendData=LegendData(:l200), period::DataPeriod=DataPeriod(3),run::DataRun=DataRun(0);mode::Symbol=:cal,channel::ChannelId=nothing)
 function load_hitch(l200::LegendData, period::DataPeriod,run::DataRun; mode::Symbol=:cal,channel::Union{ChannelId,Bool}=true)
@@ -18,13 +19,13 @@ function load_hitch(l200::LegendData, period::DataPeriod,run::DataRun; mode::Sym
 
     ch_sel_idx = findfirst(ch_all .== string(channel)[3:end])
     # read file, load energy spectrum
-    data = h5open(x -> readdata(x, "ch$(ch_all[ch_sel_idx])/dataQC"), filenames[ch_sel_idx])
+   # data = h5open(x -> readdata(x, "ch$(ch_all[ch_sel_idx])/dataQC"), filenames[ch_sel_idx])
+    data = lh5open(filenames[ch_sel_idx])["ch$(ch_all[ch_sel_idx])/dataQC"]
 
-    det_sel = dets[findfirst(map(x-> x == ch,ch_geds))]
+    det_sel = dets[findfirst(map(x-> x == channel,ch_geds))]
     @info "Load hitch from channel $(string(channel)) / detector: $(string(det_sel))"
     return data
 end
-
 
 function do_simple_calibration(energy::Vector{Float64})
     th228_lines =  [583.191,  727.330,  860.564,  1592.53,    1620.50,    2103.53,    2614.51]
@@ -34,4 +35,30 @@ function do_simple_calibration(energy::Vector{Float64})
     quantile_perc=0.995;
     result_simple, report_simple = simple_calibration(energy, th228_lines, window_sizes, n_bins=n_bins,; calib_type=:th228, quantile_perc=quantile_perc)
     return result_simple, report_simple, th228_lines, th228_names
+end
+
+function save_result(fname::String, par_names::Vector{String}, par::Union{Vector{Any},Vector{Vector{Float64}}}; path::String="JuliaBasics/results")
+   # find path 
+    path_rel = relpath(path,pwd())
+    path_abs = pwd() * "/" * path_rel * "/"
+   
+    file = h5open(path_abs * fname, "w")
+    for (i,name) in enumerate(par_names)
+        if isa(par[i],StepRangeLen)
+            par[i] = collect.(par[i])
+        end
+        write(file, name, par[i])
+    end
+    close(file)
+
+    @info "Results written to file $(path_abs * fname)"
+end
+
+function get_det_types(dets::Vector)
+    detIdx_ppc = map(x->x[1]=='P',string.(dets))
+    detIdx_icpc = map(x->x[1]=='V',string.(dets))
+    detIdx_coax = map(x->x[1]=='C',string.(dets))
+    detIdx_bege = map(x->x[1]=='B',string.(dets))
+    @sprintf("%.0f PPC, %.0f ICPC, %.0f Coax, %.0f BeGe = %.0f detectors",sum(detIdx_ppc),sum(detIdx_icpc),sum(detIdx_coax),sum(detIdx_bege),sum(detIdx_ppc)+sum(detIdx_icpc)+sum(detIdx_coax)+sum(detIdx_bege))
+    return detIdx_ppc, detIdx_icpc, detIdx_coax, detIdx_bege
 end
