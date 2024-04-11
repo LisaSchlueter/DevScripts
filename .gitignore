@@ -5,5 +5,6 @@
 # binaries
 *.h5
 *.txt
+*.jld2
 
 
