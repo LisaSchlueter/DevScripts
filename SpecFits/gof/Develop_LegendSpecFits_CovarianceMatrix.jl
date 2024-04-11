@@ -10,14 +10,16 @@ using Plots, ColorSchemes
 using Distributions # new
 using Calculus, LinearAlgebra, Zygote # new
 using ProgressMeter # new
+using Printf
 ## ------------ get input for fit: energie histogram  ------------ ##
 
-include("utils.jl")
+include("../utils.jl")
 
 # get data path and filename
+l200 = LegendData(:l200)
 ch_geds     = channelinfo(l200,(:p03,:r000,:cal),system = :geds, only_processable = true).channel;
 data        = load_hitch(l200,DataPeriod(3),DataRun(0); channel=ch_geds[1])
-data_energy = data.e_cusp 
+data_energy = [data.e_cusp...] 
 
 ## ------------ do "simple" fit --> input needed for actual fit  ------------ ##
 result_simple, report_simple, th228_lines, th228_names = do_simple_calibration(data_energy); # simple calibration, get histograms around the calibration lines and peakstats
@@ -46,7 +48,7 @@ end
 ## ------------ covariance matrix   ------------ ##
 # there is problem the covmat_fit. --> fix covariance matrix
 # --> first look at covariance matrix provided by fit routine (at the moment using ForwardDiff)
-covmat_fit = result_fit[:covmat] # covariance matrix from fit
+covmat_fit = result_fit.gof.covmat # covariance matrix from fit
 isposdef(covmat_fit) #something wrong with covmat :(
 
 function PlotCM(cm,mode)
@@ -84,7 +86,8 @@ function Print_FitResult(cm)
              else
                err = sqrt(cm[i,i])
         end
-        @info "$(first(par_name_str[i],6)) \t =  $(round(fit_par[i],digits=2))   \t err = $(round(err,digits=2)) \t rel err = $(round(100*err/fit_par[i],digits=1))% \n"
+       # info_str = "$(first(par_name_str[i],6)) \t =  $(round(fit_par[i],digits=2))   \t err = $(round(err,digits=2)) \t rel err = $(round(100*err/fit_par[i],digits=1))% \n"
+        @printf("%s = %.2f \t err = %.2g \t rel err = %.2g %%\n",first(par_name_str[i],6),fit_par[i],err,100*err/fit_par[i])#$(first(par_name_str[i],6)) \t =  $(round(fit_par[i],digits=2))   \t err = $(round(err,digits=2)) \t rel err = $(round(100*err/fit_par[i],digits=1))% \n")
     end 
 end
 Print_FitResult(covmat_fit)
