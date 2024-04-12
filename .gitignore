@@ -7,4 +7,8 @@
 *.txt
 *.jld2
 
+# OS files
+*.DS_Store
 
+# VS-Code files
+*.vscode
