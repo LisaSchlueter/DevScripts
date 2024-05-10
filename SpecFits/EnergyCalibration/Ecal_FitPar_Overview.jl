@@ -4,6 +4,8 @@ plot :
 - over view for all peaks and breakdown  
 - for all peaks and breakdown of single peaks
 - µ, \sigma  and fwhm are (re-)calibrated to keV (not just simple calibrated)
+
+--> for all dets or only ICPC, Coax, Bege,....
 =#
 using Distributions, StatsBase, DataFrames
 using LegendDataManagement
@@ -20,6 +22,11 @@ using DataFrames
 include("../SanityPlots/utils.jl")
 
 l200 = LegendData(:l200)
+# plotting path 
+path_plot = "$(@__DIR__)/plots/p$partition/FitPar/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
 
 #select data and dsp output 
 partition = 1
@@ -233,7 +240,6 @@ for det_mode in det_types_list
                     plot_titlefontsize = fs-2,
                 size = (500,1200), left_margin = 10mm, right_margin = 5mm, top_margin = 0mm )
 
-    path_plot = "$(@__DIR__)/plots/Ecal_FitPar_Overview/"
     fname = path_plot * "Ecal_Residuals_$(det_mode)_$(Mode)_part$(partition)_$(e_type).png"
     savefig(ptot,fname)
     @info "save plot to $fname"

@@ -1,6 +1,6 @@
-#= comparison µ peak fits vs literature values of calibration peaks 
-plot :
-- residual histogram: µ - literature . for all peaks and breakdown of single peaks (used for claibration)
+#= energy-calibration residuals plot 
+residuals = difference of calibrated peak positions (fit) ans literature values 
+1 overview panel (all peaks) and 1 panel per peak 
 =#
 using Distributions, StatsBase, DataFrames
 using LegendDataManagement
@@ -17,12 +17,16 @@ using DataFrames
 using StatsPlots
 include("../SanityPlots/utils.jl")
 
-l200 = LegendData(:l200)
-
 #select data and dsp output 
 partition = 1
 e_type = :e_cusp_ctc
 
+path_plot = "$(@__DIR__)/plots/p$partition/Residuals/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
+
+l200 = LegendData(:l200)
 # open data
 partinfo = partitioninfo(l200)[DataPartition(partition)]
 filekey = start_filekey(l200, (partinfo[1].period, partinfo[1].run, :cal)) 
@@ -152,7 +156,7 @@ end
 l = @layout([a{0.35h}; grid(5, 1)])
 ptot = plot(pall,p...,layout =l, size = (650,1000), xlims = xl, left_margin = 10mm, right_margin = 5mm)
 
-path_plot = "$(@__DIR__)/plots/Ecal_FitPar_Overview/"
+
 fname = path_plot * "Ecal_Residuals_$(Mode)_part$(partition)_$(e_type).png"
 savefig(ptot,fname)
 

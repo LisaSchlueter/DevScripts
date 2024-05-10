@@ -17,12 +17,16 @@ using Unitful
 using DataFrames
 include("../SanityPlots/utils.jl")
 
-path_plot = "$(@__DIR__)/plots/"
-
-l200 = LegendData(:l200)
 #select data and dsp output 
 partition = 1
 e_type = :e_cusp_ctc
+
+path_plot = "$(@__DIR__)/plots/p$partition/FitPar/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
+
+l200 = LegendData(:l200)
 
 # open data
 partinfo = partitioninfo(l200)[DataPartition(partition)]

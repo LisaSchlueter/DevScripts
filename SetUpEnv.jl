@@ -1,6 +1,7 @@
 import Pkg  
 Pkg.add("Distributions")
 Pkg.add("DataFrames")
+Pkg.add("StatsBase")
 Pkg.add("Plots")
 Pkg.add("Measurements")
 Pkg.add("Measures")

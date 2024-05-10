@@ -1,6 +1,7 @@
 #= 
 fit paramater of peaks fit (calibration data)
 look peak fits with bad pvalue. look at fit parameter , especially µ and \sigma 
+different "modes" available: modes = [:norm, :keV, :sigma, :fwhm, :skew_frac]
 =#
 using Distributions, StatsBase, DataFrames, Statistics
 using LegendDataManagement
@@ -22,6 +23,12 @@ include("../SanityPlots/utils.jl")
 l200 = LegendData(:l200) 
 partition = 1
 e_type = :e_cusp_ctc
+
+# plotting path 
+path_plot = "$(@__DIR__)/plots/p$partition/FitPar/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
 
 # open data
 partinfo = partitioninfo(l200)[DataPartition(partition)]
@@ -90,7 +97,7 @@ end
 # look at outliers == fit with p < 1 %
 th228_literature =sort([pd_ecal_p1[1][Symbol(dets_ged[1])][e_type].cal.peaks..., 1592u"keV", 2103u"keV"]) # get literature values mit denen gefittet wurde. interpolation st Qbb
 
-# sort by hand 
+# sort 
 IdxSort = sortperm(µ[:1,1,:])
 µ_sort= µ[:, :, IdxSort]
 σ_sort= σ[:, :, IdxSort]
@@ -186,7 +193,6 @@ stephist!(data[pval .< 0.01],
 plot!(plt,title = "Calibration peak fits, partition $partition, $e_type, all $(length(dets_ged)) dets", 
         titlefontsize = fs-4, dpi = 300)
 
-path_plot = "$(@__DIR__)/plots/Ecal_FitPar_Overview/"
 plt_name = path_plot * "Ecal_PeakFits_FitParOutliers_part$(partition)_$(e_type)_$Mode.png"
 savefig(plt_name)
 @info "save plot to $plt_name"

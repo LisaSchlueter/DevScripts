@@ -18,7 +18,10 @@ using DataFrames
 using Colors, ColorSchemes
 include("../SanityPlots/utils.jl")
 
-path_plot = "$(@__DIR__)/plots/Ecal_PeakFits_FitParCorr/"
+path_plot = "$(@__DIR__)/plots/p$partition/FitPar/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
 
 #select data and dsp output
 l200 = LegendData(:l200) 

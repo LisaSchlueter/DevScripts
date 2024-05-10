@@ -1,11 +1,7 @@
 #= comparison µ peak fits vs literature values of calibration peaks 
-plot 2:
-- residual histogram: µ - literature . for all peaks together
-plot 1:
-- µ with uncertainty and literature as a function of run. at the right hand side a histogram. for each peak. 
-- measure of goodness: pvalue
-- mean and error of the mean
-- open question: for all detectors together AND for each detector type separately. 
+plot: 
+- residual vs fraction in low-energy tail. 
+- 1 panel per peak 
 =#
 using Distributions, StatsBase, DataFrames
 using LegendDataManagement
@@ -22,17 +18,16 @@ using DataFrames
 using StatsPlots
 using Colors
 include("../SanityPlots/utils.jl")
-
-path_plot = "PackageDevScripts/DevelopSpecFits/EnergyCalibration/plots"
-path_rel_plot = relpath(path_plot,pwd())
-path_abs_plot = pwd() * "/" * path_rel_plot * "/"
-
-
-l200 = LegendData(:l200)
-
 #select data and dsp output 
 partition = 1
 e_type = :e_cusp_ctc
+
+path_plot = "$(@__DIR__)/plots/p$partition/Residuals/"
+if !ispath(path_plot)
+    mkdir("$path_plot")
+end 
+
+l200 = LegendData(:l200)
 
 # open data
 partinfo = partitioninfo(l200)[DataPartition(partition)]
@@ -164,6 +159,6 @@ l = @layout([a{0.35h}; grid(5, 1)])
 ptot = plot(pall,p...,layout =l, size = (650,1000),
      xlims = xl, left_margin = 10mm, right_margin = 5mm)
 
-fname = path_abs_plot * "Ecal_Residuals_$(Mode)_LWfrac_part$(partition)_$(e_type).png"
+fname = path_plot * "Ecal_Residuals_$(Mode)_LWfrac_part$(partition)_$(e_type).png"
 savefig(ptot,fname)
 

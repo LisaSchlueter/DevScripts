@@ -1,9 +1,8 @@
-#= comparison µ peak fits vs literature values of calibration peaks 
-plot:
-- µ with uncertainty and literature as a function of run. at the right hand side a histogram. for each peak. 
-- measure of goodness: pvalue
-- mean and error of the mean
-- open question: for all detectors together AND for each detector type separately. 
+#= p-value overview 
+plot 1: p-values of gamma-peak fits 
+- 1 panel: overview all peaks 
+- other panels: p-value distribution of each peak. 
+plot 2: p-value of calibration curve fit (linear/quadratic fit)
 =#
 using Distributions, StatsBase, DataFrames
 using LegendDataManagement
@@ -19,13 +18,19 @@ using Unitful
 using DataFrames
 include("../SanityPlots/utils.jl")
 
-path_plot = "$(@__DIR__)/plots/"
-
-l200 = LegendData(:l200)
-#select data and dsp output 
+#settings: select data and dsp (energy) output 
 partition = 1
 e_type = :e_cusp_ctc
 
+path_plot1 = "$(@__DIR__)/plots/p$partition/FitPar/"
+if !ispath(path_plot1)
+    mkdir("$path_plot1")
+end 
+path_plot2 = "$(@__DIR__)/plots/p$partition/CalibrationCurve/"
+if !ispath(path_plot2)
+    mkdir("$path_plot2")
+end
+l200 = LegendData(:l200)
 # open data
 partinfo = partitioninfo(l200)[DataPartition(partition)]
 filekey = start_filekey(l200, (partinfo[1].period, partinfo[1].run, :cal)) 
@@ -33,15 +38,14 @@ chinfo = Table(channelinfo(l200, filekey; system=:geds, only_processable=true))
 dets_ged = chinfo.detector
 # dets_icpc = dets_ged[chinfo.det_type .== :icpc]
 
-# load all ProbDicts (for all period-run combination in selected partition). speed up load probdict for partition 
+# load all ProbDicts (for all period-run combination in selected partition). speeds up load probdict for partition 
 pd_ecal_p1 = [l200.par.rpars.ecal[entr.period, entr.run] for entr in partinfo] # takes a while 
 nruns = length(pd_ecal_p1)
-th228_literature =sort([pd_ecal_p1[1][Symbol(dets_ged[1])][e_type].cal.peaks..., 1592u"keV", 2103u"keV"]) # get literature values mit denen gefittet wurde. interpolation st Qbb
-Qbb = 2039.0u"keV"
+th228_literature =sort([pd_ecal_p1[1][Symbol(dets_ged[1])][e_type].cal.peaks..., 1592u"keV", 2103u"keV"]) # get literature values
 npeaks = length(th228_literature)
 peak_keys = Symbol.(collect(keys(pd_ecal_p1[1][dets_ged[1]][e_type].fit)))
 
-# all calibration fit results for a specific detector
+# re-shuffle results for a specific detector
 pvalues_calfit = NaN .* zeros((length(dets_ged), nruns))
 pvalues_peakfit = ones(length(dets_ged), nruns, npeaks) .* NaN
 
@@ -143,7 +147,7 @@ end
 l = @layout([a{0.2h}; grid(7, 1)])
 ptot = plot(pall,p...,layout =l, size = (600,1200), xlims = (0,1), ylims = (0,0.11), left_margin = 10mm, right_margin = 5mm)
 
-fname = path_plot * "Ecal_PeakFit_pvalueDist_part$(partition)_$(e_type).png"
+fname = path_plot1 * "Ecal_PeakFit_pvalueDist_part$(partition)_$(e_type).png"
 savefig(ptot,fname)
 
 ################################################################
@@ -167,5 +171,5 @@ plot!(plt,ylims = (0,1),
     left_margin = 10mm, bottom_margin = 10mm,
     title = "Calibration curve fit, all dets, partition $(partition), $e_type", titlefontsize = 12)
 
-fname_calfit = path_plot * "Ecal_CalFit_pvalueDist_part$(partition)_$(e_type).png"
+fname_calfit = path_plot2 * "Ecal_CalFit_pvalueDist_part$(partition)_$(e_type).png"
 savefig(plt,fname_calfit)
