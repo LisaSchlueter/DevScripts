@@ -1,6 +1,6 @@
 #= energy-calibration residuals plot 
 residuals = difference of calibrated peak positions (fit) ans literature values 
-1 overview panel (all peaks) and 1 panel per peak 
+comparison of residuals (all peaks) between the different detector types
 =#
 using Measures
 using Plots, Printf, LaTeXStrings
@@ -15,27 +15,27 @@ using StatsBase
 include("$(@__DIR__)/utils_ecal.jl")
 
 #select data and dsp output 
-partition = 3
+partition = 1
 e_type = :e_cusp_ctc
 cal = true # calibration data
 
 FitPars, MetaData = get_peakfit_rpars_partition(DataPartition(partition); reload = false, e_type = e_type, cal = cal);
 #plot only those used in calibration fit 
 CalPeakIdx = findall([(MetaData.th228_names[peak] !==  :Tl208DEP) && (MetaData.th228_names[peak] !==  :Tl208SEP) for peak in eachindex(MetaData.th228_names)])
-residual = FitPars.residual[:,:,CalPeakIdx]
-residual_norm = mvalue.(residual) ./ muncert.(residual)
 npeaks = length(CalPeakIdx)
 th228_literature = MetaData.th228_literature[CalPeakIdx]
+
+residual = reshape(FitPars.residual[:,:,CalPeakIdx], length(MetaData.dets_ged),:)
+residual_norm = reshape(mvalue.(residual) ./ muncert.(residual),length(MetaData.dets_ged),:) # throw all runs/peaks together 
+
 
 path_plot = "$(@__DIR__)/plots/p$partition/Residuals/"
 if !ispath(path_plot)
     mkpath("$path_plot")
 end 
 
-Tbl_lbl = ["E = $(round(typeof(1u"keV"), th228_literature[i], digits = 0))" for i=1:npeaks]
-
 # plot settings
-Mode = :norm
+Mode = :keV
 fs = 14 # font size 
 colors = [:dodgerblue, :darkorange, :lightseagreen, :crimson, :violet]
 HistArg = Dict(:normalize => :none,
@@ -64,6 +64,12 @@ elseif Mode == :keV
     xunit = "keV"
     nbins = 400
 end
+data_det_types = [:bege, :icpc, :ppc, :coax]
+data_det = [data[findall(MetaData.dets_type .== data_det_types[1]),:], 
+            data[findall(MetaData.dets_type .==  data_det_types[2]),:], 
+            data[findall(MetaData.dets_type .==  data_det_types[3]),:], 
+            data[findall(MetaData.dets_type .==  data_det_types[4]),:]]
+
 # plot overview for all detectors : histograms below each other 
 bin_center, bin_edges, _, counts = get_histstats(ustrip.(mvalue.(data)); nbins = nbins)
 median_tot = median(filter(isfinite,reshape(data,:)))
@@ -73,50 +79,52 @@ pall = stephist(reshape(data,:), bins = bin_edges,
                 framestyle = :box, 
                 legend = :topleft,
                 ylims = (0,:auto),
-                label = "All peaks",
+                label = "All detectors, \nall peaks",
                 ylabel = "Occurrence",
                 xlabel  = xlbl 
                 ; HistArg...)
+
 stat_str_all = "median = " * @sprintf("%.2f%s\n",ustrip(mvalue(median_tot)),xunit) *  @sprintf("fwhm = %.2f%s",fwhm_tot,xunit)
 annotate!(stat_x, ylims()[2]*0.9, text(stat_str_all, :right, fs-2, :grey))
 vline!([0],label = :none, color = :black, linestyle = :dash, linewidth = 2)
 medians = fill(0.0, npeaks)
 fwhm = fill(0.0, npeaks)
-for i = 1:npeaks
+for i in eachindex(data_det)
     bin_center, counts = nothing, nothing
-    bin_center, _ , _, counts = get_histstats(mvalue.(ustrip.(data[:,:,i])); nbins = 300)
-    medians[i] = median(filter(isfinite, mvalue.(ustrip.(reshape(data[:,:,i],:)))))
+    bin_center, _ , _, counts = get_histstats(mvalue.(ustrip.(data_det[i])); nbins = 300)
+    medians[i] = median(filter(isfinite, mvalue.(ustrip.(reshape(data_det[i],:)))))
     fwhm[i] = get_fwhm(bin_center,counts)
 end
-p = Vector(undef, npeaks)
-for i = 1:npeaks
+p = Vector(undef, length(data_det_types))
+for i in eachindex(data_det_types)
     stat_str = "median = " * @sprintf("%.2f%s\n",medians[i],xunit) *  @sprintf("fwhm = %.2f%s",fwhm[i],xunit)
-    lbl = "E = $(round(typeof(1u"keV"), th228_literature[i], digits = 0))" 
-    p[i] = stephist(reshape(data[:,:,i],:), bins = bin_edges, 
+    lbl = uppercase("$(data_det_types[i])")
+    p[i] = stephist(reshape(data_det[i],:), bins = bin_edges, 
             color = colors[i], 
             fillalpha = 0.8,  
             legend = :left,
             yaxis=false, 
             ylims = (0,:auto),
+            ylabel = " ",
             label=lbl;
             HistArg...)  
     annotate!(stat_x, ylims()[2]*0.5, text(stat_str, :right, fs-2, colors[i]))
     vline!([0],label = :none, color = :black, linestyle = :dash, linewidth = 2)
-    if i == npeaks
+    if i == length(data_det_types)
         plot!(p[i], xlabel  = xlbl )
     else
         # myxticks = xticks(p[i])
         # Set the labels to empty strings
-        plot!(p[i],bottom_margin = -7mm, xformatter=_->"")#, xticks = (myxticks, fill(" ", length(myxticks))))
+        #plot!(p[i],bottom_margin = -7mm, xformatter=_->"")#, xticks = (myxticks, fill(" ", length(myxticks))))
     end
 end
-l = @layout([a{0.35h}; grid(5, 1)])
-ptot = plot(pall,p...,layout =l, size = (650,1000), xlims = xl, left_margin = 10mm, right_margin = 5mm)
+l = @layout([a{0.25h}; grid(5, 1)])
+ptot = plot(pall,p...,layout =l, size = (650,1200), xlims = xl, left_margin = 10mm, right_margin = 5mm)
 
 if cal == true
-    fname = path_plot * "Ecal_Residuals_$(Mode)_part$(partition)_$(e_type).png"
+    fname = path_plot * "Ecal_Residuals_DetTypes_$(Mode)_part$(partition)_$(e_type).png"
 elseif cal == false
-    fname = path_plot * "Ecal_Residuals_$(Mode)_part$(partition)_$(e_type)_simplecal.png"
+    fname = path_plot * "Ecal_Residuals_DetTypes_$(Mode)_part$(partition)_$(e_type)_simplecal.png"
 end
 savefig(ptot,fname)
 @info "save plot to $fname"

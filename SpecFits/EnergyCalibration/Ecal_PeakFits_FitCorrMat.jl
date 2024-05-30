@@ -1,4 +1,5 @@
 #= comparison µ peak fits vs literature values of calibration peaks 
+does not seem very reliable. use Ecal_PeakFits_Correlations instead
 plot:
 - covariance matrices for each peak
 - mean and error of the mean or std 
