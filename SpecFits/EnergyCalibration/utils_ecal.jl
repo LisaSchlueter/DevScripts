@@ -80,6 +80,7 @@ function get_peakfit_rpars_partition(partition::DataPartition; reload::Bool = fa
     skew_frac = ones(length(dets_ged), nruns, npeaks) .* NaN  .± NaN 
     skew_width = ones(length(dets_ged), nruns, npeaks) .* NaN  .± NaN   
     µ  = ones(length(dets_ged), nruns, npeaks) .* NaN * u"keV"  .± NaN  * u"keV"
+    µ_simple  = ones(length(dets_ged), nruns, npeaks) .* NaN * u"keV"  .± NaN  * u"keV" # simple calibrated
     σ  = ones(length(dets_ged), nruns, npeaks) .* NaN * u"keV"  .± NaN  * u"keV"
     fwhm  = ones(length(dets_ged), nruns, npeaks) .* NaN * u"keV"  .± NaN  * u"keV"
     background = ones(length(dets_ged), nruns, npeaks) .* NaN  .± NaN 
@@ -112,7 +113,7 @@ function get_peakfit_rpars_partition(partition::DataPartition; reload::Bool = fa
                             cal_func = ljl_propfunc(probdict_part[i][det][e_type].cal.func)
                             µ[d,i,p] = collect(cal_func.(Tbl))[1] # calibrated peak position for period given run and detector 
                             σ[d,i,p] = collect(cal_func.(Tbl))[2] .- probdict_part[i][det][e_type].cal.par[1] # calibrated (w/o offset)
-                            fwhm[d,i,p] = collect(cal_func.(Tbl))[3] .- probdict_part[i][det][e_type].cal.par[1] # calibrated (w/o offset)
+                            fwhm[d,i,p] = collect(cal_func.(Tbl))[3] .- probdict_part[i][det][e_type].cal.par[1] # calibrated (w/o offset) 
                         elseif cal == false 
                             µ[d,i,p] = probdict_part[i][det][e_type].fit[pname].µ 
                             σ[d,i,p] = probdict_part[i][det][e_type].fit[pname].σ 
@@ -286,6 +287,103 @@ function get_calcurvefit_rpars_partition(partition::DataPartition; reload::Bool 
     return CalPars, MetaData
 end
 
+function get_fwhmcurvefit_rpars_partition(partition::DataPartition; reload::Bool = false, e_type::Symbol = :e_cusp_ctc )
+    path_data = "$(@__DIR__)/EcalData/"
+    file_data = path_data * "Ecal_fwhmcurve_rpars_$(partition).jld2"
+
+    if isfile(file_data) && reload == false && e_type == :e_cusp_ctc
+        @info "load fwhm fit parameter from file $file_data..."
+        file = jldopen(file_data)
+        return file["FWHMPars"], file["MetaData"]
+    end
+    @info "load fwhm fit parameter from rpars for $partition"
+    l200 = LegendData(:l200)
+    partinfo = partitioninfo(l200)[partition]
+    filekey = start_filekey(l200, (partinfo[1].period, partinfo[1].run, :cal)) 
+    chinfo = Table(channelinfo(l200, filekey; system=:geds, only_processable=true))
+    dets_ged = chinfo.detector
+    dets_type = chinfo.det_type
+
+    # load all ProbDicts (for all period-run combination in selected partition). speed up load probdict for partition 
+    probdict_part = [l200.par.rpars.ecal[entr.period, entr.run] for entr in partinfo] 
+    nruns = length(probdict_part)
+    # load peaks 
+    th228_literature = sort([probdict_part[1][Symbol(dets_ged[1])][e_type].cal.peaks...]) # get literature values
+    npeaks = length(th228_literature)
+    good_det = ones(length(dets_ged)) .* true
+
+    # re-shuffle results for a specific detector
+    pvalues = zeros((length(dets_ged), nruns)) .* NaN   
+    fwhm_fit  = zeros((length(dets_ged), nruns, npeaks)).* NaN .* u"keV" .± NaN .* u"keV"
+    fwhm_qbb  = zeros((length(dets_ged), nruns)).* NaN .* u"keV" .± NaN .* u"keV"
+    µ   = zeros((length(dets_ged), nruns, npeaks))  .* NaN  .*u"keV"  .± NaN     .*u"keV"
+    peaks_literature_keV   = zeros((length(dets_ged), nruns, npeaks))  .* NaN   .*u"keV"
+    residuals_norm  = zeros((length(dets_ged), nruns, npeaks)).* NaN  
+    
+
+    for i = 1:nruns
+        @info "run $i"
+        for (d, det) in enumerate(dets_ged)
+            loadLog = true
+            if !haskey(probdict_part[i],det) 
+                loadLog = false 
+                @info "det $det ($d) missing"
+            elseif haskey(probdict_part[i],det) 
+                if !haskey(probdict_part[i][det],e_type)
+                    loadLog = false 
+                    @info "$(e_type) of det $det ($d) missing"
+                end      
+            end
+            if loadLog == true
+               
+                pvalues[d,i] = probdict_part[i][dets_ged[d]][e_type].fwhm.gof.pvalue 
+                fwhm_qbb[d,i] = probdict_part[i][dets_ged[d]][e_type].fwhm.qbb 
+                peaks_tmp =  probdict_part[i][dets_ged[d]][e_type].fwhm.peaks
+
+                µ_ADC = probdict_part[i][dets_ged[d]][e_type].cal.µ
+                Tbl = Table(e_cusp = [µ_ADC...], qdrift = fill(0, length(µ_ADC)))
+                cal_func = ljl_propfunc(probdict_part[i][det][e_type].cal.func) 
+
+                if length(peaks_tmp) !== npeaks
+                    @info "not all peaks "
+                    peak_idx = reduce(vcat, [findall(peaks_tmp[peak] .== th228_literature) for peak in eachindex(peaks_tmp)])
+                    peaks_literature_keV[d,i,peak_idx] = peaks_tmp 
+                    fwhm_fit[d,i,peak_idx] =  probdict_part[i][dets_ged[d]][e_type].fwhm.fwhm
+                    residuals_norm[d, i, peak_idx] = probdict_part[i][dets_ged[d]][e_type].fwhm.gof.residuals_norm
+                    µ[d,i,peak_idx] = collect(cal_func.(Tbl))# calibrated peak position for period given run and detector
+                else
+                    peaks_literature_keV[d,i,:] = peaks_tmp 
+                    fwhm_fit[d,i,:] =  probdict_part[i][dets_ged[d]][e_type].fwhm.fwhm  
+                    residuals_norm[d,i,:] = probdict_part[i][dets_ged[d]][e_type].fwhm.gof.residuals_norm
+                    µ[d,i,:] = collect(cal_func.(Tbl))# calibrated peak position for period given run and detector
+                end
+            else
+                @info "skip run $i det $det ($d)"
+                pvalues[d,i] = NaN
+                fwhm_fit[d,i,:] = fill(NaN, npeaks) .* u"keV" .± NaN .* u"keV"
+                fwhm_qbb[d,i] = NaN * u"keV" .± NaN * u"keV"    
+                residuals_norm[d,i,:] = fill(NaN, npeaks)    
+                µ[d,i,:]  = fill(NaN, npeaks) .* u"keV" .± NaN .* u"keV"
+                good_det[d] = false
+            end
+        end
+    end
+    FWHMPars = (µ = µ, 
+                fwhm_fit = fwhm_fit,
+                fwhm_qbb = fwhm_qbb,
+              peaks_literature_keV = peaks_literature_keV,
+              th228_literature = th228_literature,
+              residuals_norm = residuals_norm,
+              pvalue = pvalues)
+
+    MetaData = (dets_ged = dets_ged, good_det = good_det, dets_type = dets_type, npeaks = npeaks, th228_literature = th228_literature, nruns = nruns, partinfo = partinfo)
+    if !ispath(path_data)
+        mkdir("$path_data")
+    end
+    jldsave(file_data, FWHMPars = FWHMPars, MetaData = MetaData)
+    @info "saved ecal cal pars to $file_data"
+    return FWHMPars, MetaData
+end
 # function get_peakfit_residuals(partition::DataPartition; reload::Bool = false,  e_type::Symbol= :e_cusp_ctc )
 #     path_data = "$(@__DIR__)/EcalData/"
 #     file_data = path_data * "Ecal_peakfit_residuals_$(partition)_simplecal.jld2"

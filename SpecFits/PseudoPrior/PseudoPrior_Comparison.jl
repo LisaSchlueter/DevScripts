@@ -29,7 +29,7 @@ for pidx in eachindex(th228_names)
 
     # fit with very wide pseudo-priors; effectively no prior
     wide_pseudo_prior = LegendSpecFits.NamedTupleDist(
-        μ = Uniform(ps.peak_pos-1000, ps.peak_pos+1000),
+        μ = Uniform(ps.peak_pos-10, ps.peak_pos+10),
         σ = weibull_from_mx(ps.peak_sigma, 100*ps.peak_sigma),
         n = weibull_from_mx(ps.peak_counts, 100*ps.peak_counts),
         step_amplitude = weibull_from_mx(ps.mean_background_step, ps.mean_background_step + 100*ps.mean_background_std),
