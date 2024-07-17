@@ -48,7 +48,7 @@ for i in  1:1:25
         ylt = 3
     end
     plttitle = "$(MetaData.partinfo[BadFits[i][2]].period)-$(MetaData.partinfo[BadFits[i][2]].run), detector $(MetaData.dets_ged[BadFits[i][1]]) ($(MetaData.dets_type[BadFits[i][1]]), $(BadFits[i][1]))\n" * "max. |residual| =  $(round(typeof(residuals[1]),maximum(abs.(residuals)), digits = 2)) ($(round(maximum(abs.(residuals./pp_fit .* 100)),digits =2))%)"
-    plt = plot(report_calib, size = (600, 370), plot_title = plttitle, plot_titlefontsize = 7, thickness_scaling = 1.2, bottom_margin = 5mm, xtickfontsize = 6, ms = 3, ylims = (-ylres, ylres), yticks = -21:ylt:21)
+    local plt = plot(report_calib, size = (600, 370), plot_title = plttitle, plot_titlefontsize = 7, thickness_scaling = 1.2, bottom_margin = 5mm, xtickfontsize = 6, ms = 3, ylims = (-ylres, ylres), yticks = -21:ylt:21)
     scatter!(mvalue.(µ_fit), ustrip.(pp_fit), xerr = 1e3 .* muncert.(µ_fit), ms = 1.5, color = :white, markerstrokecolor = :slategrey, label = false) 
     scatter!(mvalue.(µ_fit), ustrip.(pp_fit), yerr = 1e3 .* ustrip.(y_err_pred), ms = 1.5, color = :white, markerstrokecolor = :darkorange, label = "peak-fit uncertainty x 1e3") 
     scatter!(mvalue.(µ_fit), ustrip.(pp_fit), ms = 3, color = :black, markerstrokecolor = :black, label = false) 
