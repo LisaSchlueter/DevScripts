@@ -20,7 +20,7 @@ fontsize = 16
 
 # data selection 
 e_type = :e_cusp_ctc
-periods = [3, 4, 6, 7, 8, 9]
+periods = [3, 4,]
 exclPeaks = []# [:Tl208DEP, :Tl208SEP] # exclude peaks from plot
 
 # load fit results 
@@ -28,10 +28,12 @@ l200 = LegendData(:l200)
 FitPars, MetaData = get_rpars_peakfit(l200, periods; reload = false, e_type = e_type, cal_type = :ecal);
 FitPars_tails, MetaData_tails = get_rpars_peakfit(l200, periods; reload = false, e_type = e_type, cal_type = :ecal_tails);
 FitPars_bslope, MetaData_bslope = get_rpars_peakfit(l200, periods; reload = false, e_type = e_type, cal_type = :ecal_bslope);
+FitPars_exp, MetaData_exp = get_rpars_peakfit(l200, periods; reload = false, e_type = e_type, cal_type = :ecal_exp);
 MetaData.ecal_config.th228_names[4]
-FitPars1 = FitPars_tails#bslope
+
+FitPars1 = FitPars_exp
 FitPars2 = FitPars
-MetaData1 = MetaData_tails
+MetaData1 = MetaData_exp
 MetaData2 = MetaData
 skew_frac_diff = ustrip.(mvalue.(FitPars1.skew_frac)) .- ustrip.(mvalue.(FitPars2.skew_frac))
 chi2_diff = ustrip.(mvalue.(FitPars1.chi2)) .- ustrip.(mvalue.(FitPars2.chi2))
@@ -43,7 +45,7 @@ colors = _get_def_peakcolors()
 pall = scatter(reshape(skew_frac_diff,:), reshape(chi2_diff,:), 
         color = :darkgrey, alpha = 0.1, markerstrokewidth=0, 
         margins = 3mm,
-        label = "all peaks, model: slope - default", 
+        label = "all peaks, model: $(MetaData1.cal_type) - $(MetaData2.cal_type)", 
         ylabel = "Δ χ²",
         xlabel = "Δ Low-energy tail fraction")
 ylims!(-20, 20)
@@ -72,6 +74,4 @@ fname = path_plot * "Ecal_PeakFitDiff_all_chi2skewfrac_period$(join(string.(peri
 savefig(ptot, fname)
 @info "save plot to $fname"
 
-
-# plot only DEP
-stephist()
+display(ptot)

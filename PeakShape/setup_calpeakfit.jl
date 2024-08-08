@@ -11,38 +11,17 @@ using Plots
 using Distributions 
 using ValueShapes
 using LaTeXStrings
-
+include("./utils_ecal.jl")
 # data selection 
 l200 = LegendData(:l200)
 runsel = (DataPeriod(3), DataRun(0), :cal)
 chinfo = channelinfo(l200, runsel; system=:geds, only_processable=true)
 dets_ged  = chinfo.detector
 det_types = reverse(unique(detector_type.(Ref(l200), dets_ged)))
-peakshape = :f_fit_WithBkgSlope
+peakshape = :f_fit_bckExp#Slope
 
-function get_energy_ctc(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
-    channel = detector2channel(data, runsel, detector)
-    (period, run, category) = runsel
-    data_ch = lh5open(data.tier[:jlhitch, category, period, run, channel])[channel, :dataQC][:]#.e_cusp
-    ecusp_ctc_uncal = ljl_propfunc(data.par.rpars.ctc[period, run, detector][e_type].func).(data_ch)
-    return ecusp_ctc_uncal
-end
 
-function simple_cal(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
-    e_cusp_ctc_ADC = get_energy_ctc(data, runsel, detector; e_type = e_type)
-    # get config for calibration fits
-    energy_config = dataprod_config(data).energy(start_filekey(data, runsel))
-    energy_config_ch = merge(energy_config.default, get(energy_config, detector, PropDict()))
-
-    quantile_perc = if energy_config_ch.quantile_perc isa String parse(Float64, energy_config_ch.quantile_perc) else energy_config_ch.quantile_perc end
-    th228_names = Symbol.(energy_config_ch.th228_names)
-    th228_lines_dict = Dict(th228_names .=> energy_config_ch.th228_lines)
-
-    # simple calibration 
-    result_simple, report_simple = simple_calibration(e_cusp_ctc_ADC, energy_config_ch.th228_lines, energy_config_ch.left_window_sizes, energy_config_ch.right_window_sizes,; calib_type=:th228, n_bins=energy_config_ch.n_bins, quantile_perc=quantile_perc, binning_peak_window=energy_config_ch.binning_peak_window)
-    return result_simple, report_simple, th228_names, th228_lines_dict
-end
-
+th228_names = []
 for det_type in det_types
     dets_plt = findall(x->x==det_type, detector_type.(Ref(l200), dets_ged))[1:5]
 
@@ -57,11 +36,14 @@ for det_type in det_types
 
 
         try
-            result_simple, report_simple, th228_names, th228_lines_dict = simple_cal(l200, runsel, det)
-        catch
-            @info "hitch file not found or other problem - continue"
-            continue 
-        end
+            local result_simple, _, th228_names, _ = simple_cal(l200, runsel, det)
+         catch e
+             @info "hitch file not found or other problem. $e"
+             continue 
+         end
+         if !@isdefined(result_simple)
+            continue
+         end 
         ## --------------------------------- preparation for fit end--------------------------------- ##   
         # fit 1: baselinefit with default peakshape
         result, report = fit_peaks(result_simple.peakhists, result_simple.peakstats, th228_names; e_unit=result_simple.unit, calib_type=:th228, fit_func = :f_fit);
@@ -86,6 +68,7 @@ for det_type in det_types
         savefig(figname)
     end
 end
+
 # compare fit parameter for these fits 
 function compare_fitpar(result1, result2)
     Table(
