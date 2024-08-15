@@ -14,19 +14,20 @@ using LaTeXStrings
 include("./utils_ecal.jl")
 # data selection 
 l200 = LegendData(:l200)
-runsel = (DataPeriod(3), DataRun(0), :cal)
+runsel = (DataPeriod(3), DataRun(4), :cal)
 chinfo = channelinfo(l200, runsel; system=:geds, only_processable=true)
 dets_ged  = chinfo.detector
 det_types = reverse(unique(detector_type.(Ref(l200), dets_ged)))
 peakshape = :f_fit#Slope
 
-det = dets_ged[71] 
+det = dets_ged[17] 
 result_simple, _, th228_names, _ = simple_cal(l200, runsel, det)
 result, report = fit_peaks(result_simple.peakhists, result_simple.peakstats, th228_names; e_unit=result_simple.unit, calib_type=:th228, fit_func = peakshape);
 
 # plots 
 p = plot(broadcast(k -> plot(report[k], left_margin=20mm, top_margin=-5mm, bottom_margin=-2mm, title=string(k), ms=2), th228_names)..., layout=(length(report), 1), size=(1000,710*length(report)) , thickness_scaling=1.8, titlefontsize = 10, legendfontsize = 8, yguidefontsize = 9, xguidefontsize=11)
 [result[peak].skew_fraction for peak in th228_names]
+[result[peak].gof.converged for peak in th228_names]
 # plot(report_fit[th228_names[4]], legend = :topleft, thickness_scaling=1.1, title =  "$(runsel[1]), $(runsel[2]), $det: " * string(th228_names[4]), titlefontsize = 12, ms = 3)
 # pltpath = "$(@__DIR__)/plots/specfit/"
 # if !isdir(pltpath)
@@ -36,7 +37,7 @@ p = plot(broadcast(k -> plot(report[k], left_margin=20mm, top_margin=-5mm, botto
 # # savefig(figname)
  
 
-runperiods = [search_disk(DataRun,l200.tier[:raw, :cal, DataPeriod(period)]) for period in periods]
+runperiods = [search_disk(DataRun,l200.tier[:raw, :cal, DataPeriod(period)]) for period in [3,4]]
 #= fits with skew_frac above 1.0 --> [det, run, peak]
 run 1 --> period 3, run 0 
 CartesianIndex(17, 5, 1)

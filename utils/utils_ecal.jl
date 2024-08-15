@@ -2,6 +2,7 @@
 using JLD2
 using LegendDataManagement
 using LegendDataManagement.LDMUtils
+using LegendHDF5IO
 using LegendSpecFits
 using Unitful
 using Measurements
@@ -326,13 +327,15 @@ end
 function get_energy_ctc(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
     channel = detector2channel(data, runsel, detector)
     (period, run, category) = runsel
-    data_ch = lh5open(data.tier[:jlhitch, category, period, run, channel])[channel, :dataQC][:]#.e_cusp
-    ecusp_ctc_uncal = ljl_propfunc(data.par.rpars.ctc[period, run, detector][e_type].func).(data_ch)
+    # data_ch = lh5open(data.tier[:jlhitch, category, period, run, channel])[channel, :dataQC][:]#.e_cusp
+    data_ch = read_ldata(l200, :jldsp, category, period, run, channel)
+    ecusp_ctc_uncal = ljl_propfunc(data.par.rpars.ctc[period, run, detector][e_type].func).(data_ch) # apply charge trapping correction
     return ecusp_ctc_uncal
 end
 
 function simple_cal(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
     e_cusp_ctc_ADC = get_energy_ctc(data, runsel, detector; e_type = e_type)
+    e_cusp_ctc_ADC = filter(isfinite, e_cusp_ctc_ADC)
     # get config for calibration fits
     energy_config = dataprod_config(data).energy(start_filekey(data, runsel))
     energy_config_ch = merge(energy_config.default, get(energy_config, detector, PropDict()))
