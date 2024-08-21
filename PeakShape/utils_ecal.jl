@@ -326,13 +326,21 @@ end
 function get_energy_ctc(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
     channel = detector2channel(data, runsel, detector)
     (period, run, category) = runsel
-    data_ch = lh5open(data.tier[:jlhitch, category, period, run, channel])[channel, :dataQC][:]#.e_cusp
-    ecusp_ctc_uncal = ljl_propfunc(data.par.rpars.ctc[period, run, detector][e_type].func).(data_ch)
-    return ecusp_ctc_uncal
+    data_ch = lh5open(data.tier[:jlhitch, category, period, run, channel])[channel, :dataQC][:]
+    e_type_name = Symbol(split(string(e_type), "_ctc")[1])
+    if endswith(string(e_type), "_ctc")
+        @info "Apply CT correction for $e_type"
+        e_uncal_func = pars_ctc[detector][e_type_name].func
+        e_uncal = ljl_propfunc(e_uncal_func).(data_ch)
+    else
+        e_uncal = getproperty(data_ch, e_type_name)
+    end
+    return e_uncal
 end
 
+
 function simple_cal(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}, detector::DetectorId; e_type::Symbol=:e_cusp)
-    e_cusp_ctc_ADC = get_energy_ctc(data, runsel, detector; e_type = e_type)
+    e_ADC = get_energy_ctc(data, runsel, detector; e_type = e_type)
     # get config for calibration fits
     energy_config = dataprod_config(data).energy(start_filekey(data, runsel))
     energy_config_ch = merge(energy_config.default, get(energy_config, detector, PropDict()))
@@ -342,7 +350,7 @@ function simple_cal(data::LegendData, runsel::Tuple{DataPeriod, DataRun, Symbol}
     th228_lines_dict = Dict(th228_names .=> energy_config_ch.th228_lines)
 
     # simple calibration 
-    result_simple, report_simple = simple_calibration(e_cusp_ctc_ADC, energy_config_ch.th228_lines, energy_config_ch.left_window_sizes, energy_config_ch.right_window_sizes,; calib_type=:th228, n_bins=energy_config_ch.n_bins, quantile_perc=quantile_perc, binning_peak_window=energy_config_ch.binning_peak_window)
+    result_simple, report_simple = simple_calibration(e_ADC, energy_config_ch.th228_lines, energy_config_ch.left_window_sizes, energy_config_ch.right_window_sizes,; calib_type=:th228, n_bins=energy_config_ch.n_bins, quantile_perc=quantile_perc, binning_peak_window=energy_config_ch.binning_peak_window)
     @info "simple calibration done"
     return result_simple, report_simple, th228_names, th228_lines_dict
 end
