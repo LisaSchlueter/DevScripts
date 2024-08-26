@@ -12,3 +12,6 @@
 
 # VS-Code files
 *.vscode
+
+# markdowns
+*.md
